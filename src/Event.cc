@@ -21,7 +21,7 @@ namespace FDSi {
       int crystal = degai.conf.CrystalMap[meas.crateID][meas.slotID][meas.channelNumber];
 
       if (!(cloverID == -1 || crystal == -1)) { 
-        degai.AddHit(meas, cloverID, crystal);
+        degai.AddHit(meas, cloverID, crystal, e.fMeasurements[i]);
       }
       else {  
       ////////////////////////

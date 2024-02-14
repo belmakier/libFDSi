@@ -276,13 +276,13 @@ namespace FDSi {
     
   }
 
-  void DEGAi::AddHit(const PIXIE::Measurement &meas, int id, int cryst) {
+  void DEGAi::AddHit(const PIXIE::Measurement &meas, int id, int cryst, int measIndx) {
     if (nHits >= MAX_HITS) {
       std::cout << "Error! More than " << MAX_HITS << " hits" << std::endl;
       return;
     }
     if (cryst <= 3) {
-      hits[nHits].Set(meas, id, cryst, conf);
+      hits[nHits].Set(meas, id, cryst, conf, measIndx);
       ++nHits;
     }
   }

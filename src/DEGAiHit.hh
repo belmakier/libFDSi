@@ -21,6 +21,8 @@ namespace FDSi {
     int CFDForce;
     int OutOfRange;
 
+    int measIndx;
+
     bool Valid;
     
     double Theta;
@@ -33,8 +35,8 @@ namespace FDSi {
   class DEGAiHit : public GammaHit {
   public:
     DEGAiHit() {};
-    DEGAiHit(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf);
-    void Set(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf);
+    DEGAiHit(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf, int measInd);
+    void Set(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf, int measInd);
     void Print() { 
       std::cout << "Clover ID: " << CloverID << std::endl;
       std::cout << "Crystal ID: " << CrystalID << std::endl;

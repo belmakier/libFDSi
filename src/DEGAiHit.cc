@@ -28,9 +28,9 @@ namespace FDSi {
     }
   }
 
-  DEGAiHit::DEGAiHit(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf) { Set(meas, id, cryst, conf); }
+  DEGAiHit::DEGAiHit(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf, int measInd) { Set(meas, id, cryst, conf, measInd); }
 
-  void DEGAiHit::Set(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf) {
+  void DEGAiHit::Set(const PIXIE::Measurement &meas, int id, int cryst, const DEGAiConf &conf, int measInd) {
     GammaHit::Set(meas, id, cryst);
     timestamp = timestamp + conf.toff[id][cryst]*3276.8;
 
@@ -38,6 +38,8 @@ namespace FDSi {
     Phi = conf.phi[CloverID][CrystalID]*3.1415926525/180.0;
 
     Energy = conf.gain[id][cryst]*(RawEnergy + PIXIE::Reader::Dither()) + conf.offset[id][cryst];
+
+    measIndx = measInd;
 
     if (Energy < conf.EnThresh) {
       Valid = false;

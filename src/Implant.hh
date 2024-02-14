@@ -57,6 +57,7 @@ namespace FDSi {
 
       bool present = false;
       bool valid = false;
+    bool validCut = false;
       int nHits = 0;
       int cutID = 0;
 
@@ -73,6 +74,48 @@ namespace FDSi {
       int SetPos(int type, pspmtCal &cal);
       void Calibrate(int type, pspmtCal &cal);
       void Reset();
+  };
+
+  class SiPMImplant : ImplantChannel {
+  public:
+    double TOF;
+    double dE;
+    unsigned long long time;
+
+    int energy[8][8];
+    int dynodeEn;
+    int dynodeFired;
+    int nFired;
+
+    double xpos;
+    double ypos;
+    double xcal;
+    double ycal;
+
+    double thresh;
+    int upperthresh;
+
+    bool present = false;
+    bool valid = false;
+    bool validCut = false;
+    int nHits = 0;
+    int cutID = 0;
+
+    int fired[8][8];
+
+    uint32_t tracelen;
+    uint16_t *trace; 
+  public:
+    SiPMImplant();
+    void SetMeas(PIXIE::Measurement &meas, int indx);
+    void SetDynodeMeas(PIXIE::Measurement &meas);
+    void SetAnodeMeas(PIXIE::Measurement &meas, int indx);
+    int firedAnodes();
+    int firedDynode();
+    int EnergySum();
+    int SetPos();
+    void Calibrate(int type, pspmtCal &cal);
+    void Reset();
   };
 
   class Beta : ImplantChannel {
@@ -116,6 +159,56 @@ namespace FDSi {
       void Calibrate(int type, pspmtCal &cal);
   };
 
+  class SiPMBeta : ImplantChannel {
+  public:
+    unsigned long long time;
+
+    int energy[8][8];
+    int dynodeEn;
+    int dynodeFired;
+    int nFired;
+
+    double xpos;
+    double ypos;
+    double xcal;
+    double ycal;
+
+    double thresh;
+    int upperthresh;
+
+    bool present = false;
+    bool valid = false;
+    bool validCut = false;
+    int nHits;
+    double tdiff = -999; //correlation time
+    int nCuts;
+    int firstCut;
+    int cutIDs[MAX_BETACUTS];
+    double tdiffs[MAX_BETACUTS];
+
+    int fired[8][8];
+
+    uint32_t tracelen;
+    uint16_t *trace;
+
+    bool promptGamma;
+    int gammaIndex;
+    double gammaEnergy;
+    
+  public:
+    SiPMBeta();
+    void SetMeas(PIXIE::Measurement &meas, int indx);
+    void SetDynodeMeas(PIXIE::Measurement &meas);
+    void SetAnodeMeas(PIXIE::Measurement &meas, int indx);
+    int firedAnodes();
+    int firedDynode();
+    int EnergySum();
+    int SetPos();
+    void Calibrate(int type, pspmtCal &cal);
+    void Reset();
+  };
+
+  
   class IonTrigger : ImplantChannel { 
     public:
       double thresh = 0;
@@ -150,14 +243,16 @@ namespace FDSi {
 
   class Scint : ImplantChannel {
     public:
-      double energy[2];
-      unsigned long long time[2];
-      int fired[2];
-      double thresh[2];
+      double energy[4];
+      unsigned long long time[4];
+      int fired[4];
+      double thresh[4];
+    int nchans = 2;
 
       unsigned long long avtime = 0;
       bool valid = false;
       Scint();
+    Scint(int nch);
       void SetMeas(PIXIE::Measurement &meas, int indx);
       void Reset();
   };
@@ -166,11 +261,14 @@ namespace FDSi {
     public:
       unsigned long long time[4];
       double energy[4];
+    double thresh[4];
       int fired[4];
+    int nchans;
 
       unsigned long long avtime;
       bool valid = false;
-      PPAC(); 
+      PPAC();
+    PPAC(int nch); 
       void SetMeas(PIXIE::Measurement &meas, int indx);
       void Reset();
       void validate();
@@ -185,20 +283,31 @@ namespace FDSi {
 
       const static int nStored{200};
       int impCtr = 0;
+    int sipmImpCtr = 0;
       int betaCtr = 0;
+    int sipmBetaCtr = 0;
       Implant imps[nStored];
+    SiPMImplant sipmImps[nStored];
+    SiPMBeta sipmBetas[nStored];
       Beta betas[nStored];
 
       Beta *beta = &betas[0];    //current beta, implant
       Implant *imp = &imps[0];
+    SiPMImplant *sipmImp = &sipmImps[0];
+    SiPMBeta *sipmBeta = &sipmBetas[0];                                   
 
       IonTrigger *fit;     
       IonTrigger *rit;     
       Pin *pin0;
       Pin *pin1;
+      Pin *pin2;
+      Pin *pin3;
       Scint *cross_scint;
+      Scint *cross2_scint;
       Scint *img_scint;
-      PPAC *ppac;
+      PPAC *db3ppac;
+      PPAC *db4ppac;
+    PPAC *db5ppac;
 
     public:
       ImplantEvent();
@@ -212,6 +321,9 @@ namespace FDSi {
       }
       void SetBetaThresh(int indx, float val);
       void SetImplantThresh(int indx, float val);
+    void SetDB3PPACThresh(int indx, float val);
+    void SetDB4PPACThresh(int indx, float val);
+    void SetDB5PPACThresh(int indx, float val);
       void Reset();
   };
 

@@ -81,7 +81,7 @@ namespace FDSi {
 
     int ReadAngleMap(std::string mapfile) { return conf.ReadAngleMap(mapfile); }
 
-    void AddHit(const PIXIE::Measurement &meas, int id, int cryst);
+    void AddHit(const PIXIE::Measurement &meas, int id, int cryst, int measIndx);
     void MakeGammas();
     void PrintConf() { conf.Print(); }
   };

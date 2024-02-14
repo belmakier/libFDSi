@@ -18,9 +18,14 @@ namespace FDSi {
     rit = new IonTrigger();
     pin0 = new Pin();
     pin1 = new Pin();
-    cross_scint = new Scint();
-    img_scint = new Scint();
-    ppac = new PPAC();
+    pin2 = new Pin();
+    pin3 = new Pin();
+    cross_scint = new Scint(2);
+    cross2_scint = new Scint(4);
+    img_scint = new Scint(2);
+    db3ppac = new PPAC(2);
+    db4ppac = new PPAC(2);
+    db5ppac = new PPAC(4);
   }
 
   void ImplantEvent::ReadConf(std::string conffile)  {
@@ -50,6 +55,12 @@ namespace FDSi {
       else if (name == "imp") { 
         implantMap[crID][slID][chID] = (ImplantChannel**)&imp;
       }
+      else if (name == "sipmbeta") { 
+        implantMap[crID][slID][chID] = (ImplantChannel**)&sipmBeta;
+      }
+      else if (name == "sipmimp") { 
+        implantMap[crID][slID][chID] = (ImplantChannel**)&sipmImp;
+      }
       else if (name == "fit") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&fit;
       }
@@ -62,14 +73,29 @@ namespace FDSi {
       else if (name == "pin1") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&pin1;
       }
+      else if (name == "pin2") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&pin2;
+      }
+      else if (name == "pin3") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&pin3;
+      }
       else if (name == "cross_scint") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&cross_scint;
+      }
+      else if (name == "cross2_scint") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&cross2_scint;
       }
       else if (name == "img_scint") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&img_scint;
       }
-      else if (name == "ppac") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&ppac;
+      else if (name == "db3ppac") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&db3ppac;
+      }
+      else if (name == "db4ppac") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&db4ppac;
+      }
+      else if (name == "db5ppac") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&db5ppac;
       }
     }
   }
@@ -78,6 +104,18 @@ namespace FDSi {
     for (int i=0; i<nStored; ++i) {
       betas[i].thresh[indx] = val;
     }
+  }
+
+  void ImplantEvent::SetDB3PPACThresh(int indx, float val) {
+    db3ppac->thresh[indx] = val;
+  }
+
+  void ImplantEvent::SetDB4PPACThresh(int indx, float val) {
+    db4ppac->thresh[indx] = val;
+  }
+
+  void ImplantEvent::SetDB5PPACThresh(int indx, float val) {
+    db5ppac->thresh[indx] = val;
   }
 
   void ImplantEvent::SetImplantThresh(int indx, float val) {
@@ -89,14 +127,24 @@ namespace FDSi {
   void ImplantEvent::Reset() {
     beta = &betas[betaCtr];
     imp = &imps[impCtr];
+    sipmImp = &sipmImps[sipmImpCtr];
+    sipmBeta = &sipmBetas[sipmBetaCtr];
     beta->Reset();
     imp->Reset();
+    sipmImp->Reset();
+    sipmBeta->Reset();
     fit->Reset();
     rit->Reset();
     pin0->Reset();
     pin1->Reset();
+    pin2->Reset();
+    pin3->Reset();
     cross_scint->Reset();
+    cross2_scint->Reset();
     img_scint->Reset();
+    db3ppac->Reset();
+    db4ppac->Reset();
+    db5ppac->Reset();
   }
 
   Implant::Implant()
@@ -171,12 +219,139 @@ namespace FDSi {
 
   void Implant::Reset() {
     valid = false;
+    validCut = false;
     nHits = 0; 
     for (int i=0; i<5; ++i) {
       fired[i] = 0;
     }
   }
 
+  SiPMImplant::SiPMImplant()
+    : TOF(0), dE(0), time(0), present(false), valid(false), nHits(0), tracelen(0), trace(NULL), upperthresh(60000) {
+      for (int i=0; i<8; ++i) {
+        for (int j=0; j<8; ++j) {
+          energy[i][j] = 0;
+          fired[i][j] = 0;
+        }
+      }
+    }
+
+  void SiPMImplant::SetMeas(PIXIE::Measurement &meas, int indx) {
+    if (indx == 0) { SetDynodeMeas(meas); }
+    else { SetAnodeMeas(meas, indx); }
+  }
+  
+  void SiPMImplant::SetDynodeMeas(PIXIE::Measurement &meas) {
+    /*
+    if (meas.finishCode) { return; }
+    if (meas.outOfRange) { return; }
+    if (meas.CFDForce) { return; }
+    if (meas.eventEnergy < thresh) { return; }
+    if (meas.eventEnergy > upperthresh) { return; }
+    */
+
+    dynodeFired += 1;
+    if (dynodeFired == 1 || meas.eventEnergy > dynodeEn) {
+      dynodeEn = meas.eventEnergy;
+      time = meas.eventTime;
+    }
+  }
+
+  void SiPMImplant::SetAnodeMeas(PIXIE::Measurement &meas, int indx) {
+    int xind = indx%8;
+    int yind = indx/8;
+
+    //std::cout << "setting anode meas " << xind << ", " << yind << std::endl;
+
+    /*
+    if (meas.finishCode) { return; }
+    if (meas.outOfRange) { return; }
+    if (meas.CFDForce) { return; }
+    if (meas.eventEnergy < thresh) { return; }
+    if (meas.eventEnergy > upperthresh) { return; }
+    */
+
+    fired[xind][yind] += 1;
+    nFired += 1;
+
+    //std::cout << "fired" << std::endl;
+    
+    if (fired[xind][yind] == 1 || meas.eventEnergy > energy[xind][yind]) {
+      energy[xind][yind] = meas.eventEnergy;
+      if (indx == 51) { energy[xind][yind] *= 1./8.; }
+    }
+  }
+
+  int SiPMImplant::firedDynode() {
+    bool retval = true;
+    if (dynodeFired < 1) { retval = false; }
+    return retval;
+  }
+
+  int SiPMImplant::firedAnodes() {
+    bool retval = true;
+    if (nFired == 0) { retval = false; return 0; }
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (i==7 && j == 0) { continue; }
+        if (i==0 && j == 0) { continue; }
+        if (i==7 && j == 7) { continue; }
+        if (i==0 && j == 7) { continue; }
+
+        if (fired[i][j] < 1) {
+          //std::cout << i << "   " << j << " not fired" << std::endl;
+          retval = false;
+        }
+      }
+    }
+    return retval; 
+  }
+
+  int SiPMImplant::EnergySum() {
+    double sum = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (fired[i][j]) {
+          sum += energy[i][j];
+        }
+      }
+    }
+    return sum;
+  }
+
+  int SiPMImplant::SetPos() {
+    //if (!firedAnodes()) { return -1; }
+    double sum = 0 ;
+    double xsum = 0;
+    double ysum = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (fired[i][j]) {
+          xsum += i*energy[i][j];
+          ysum += (8-j)*energy[i][j];
+          sum += energy[i][j];
+        }
+      }
+    }
+    xpos = xsum/sum/8;
+    ypos = ysum/sum/8;
+
+    return 0;
+  }
+
+  void SiPMImplant::Reset() {
+    valid = false;
+    validCut = false;
+    nFired = 0;
+    dynodeFired = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        fired[i][j] = 0;
+      }
+    }
+  }
+
+  
   Beta::Beta() : nCuts(0), time(0), present(false), valid(false), nHits(0), tdiff(-999), tracelen(0), upperthresh(60000) {
     for (int i=0; i<5; ++i) {
       energy[0][i] = 0;
@@ -258,6 +433,129 @@ namespace FDSi {
     promptGamma = false;
   }
 
+  SiPMBeta::SiPMBeta()
+    : time(0), present(false), valid(false), nHits(0), tracelen(0), trace(NULL), upperthresh(60000) {
+      for (int i=0; i<8; ++i) {
+        for (int j=0; j<8; ++j) {
+          energy[i][j] = 0;
+          fired[i][j] = 0;
+        }
+      }
+    }
+
+  void SiPMBeta::SetMeas(PIXIE::Measurement &meas, int indx) {
+    if (indx == 0) { SetDynodeMeas(meas); }
+    else { SetAnodeMeas(meas, indx); }
+  }
+  
+  void SiPMBeta::SetDynodeMeas(PIXIE::Measurement &meas) {
+    /*
+    if (meas.finishCode) { return; }
+    if (meas.outOfRange) { return; }
+    if (meas.CFDForce) { return; }
+    if (meas.eventEnergy < thresh) { return; }
+    if (meas.eventEnergy > upperthresh) { return; }
+    */
+
+    dynodeFired += 1;
+    if (dynodeFired == 1 || meas.eventEnergy > dynodeEn) {
+      dynodeEn = meas.eventEnergy;
+      time = meas.eventTime;
+    }
+  }
+
+  void SiPMBeta::SetAnodeMeas(PIXIE::Measurement &meas, int indx) {
+    int xind = indx%8;
+    int yind = indx/8;
+
+    //std::cout << "setting anode meas " << xind << ", " << yind << std::endl;
+
+    /*
+    if (meas.finishCode) { return; }
+    if (meas.outOfRange) { return; }
+    if (meas.CFDForce) { return; }
+    if (meas.eventEnergy < thresh) { return; }
+    if (meas.eventEnergy > upperthresh) { return; }
+    */
+
+    fired[xind][yind] += 1;
+    nFired += 1;
+
+    //std::cout << "fired" << std::endl;
+    
+    if (fired[xind][yind] == 1 || meas.eventEnergy > energy[xind][yind]) {
+      energy[xind][yind] = meas.eventEnergy;
+    }
+  }
+
+  int SiPMBeta::firedDynode() {
+    bool valid = true;
+    if (dynodeFired < 1) { valid = false; }
+    return valid;
+  }
+
+  int SiPMBeta::firedAnodes() {
+    if (nFired == 0) { valid = false; return 0; }
+    bool valid = true;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (i==7 && j == 0) { continue; }
+        if (i==0 && j == 0) { continue; }
+        if (i==7 && j == 7) { continue; }
+        if (i==0 && j == 7) { continue; }
+
+        if (fired[i][j] < 1) {
+          //std::cout << i << "   " << j << " not fired" << std::endl;
+          valid = false;
+        }
+      }
+    }
+    return valid; 
+  }
+
+  int SiPMBeta::EnergySum() {
+    double sum = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (fired[i][j]) {
+          sum += energy[i][j];
+        }
+      }
+    }
+    return sum;
+  }
+
+  int SiPMBeta::SetPos() {
+    //if (!firedAnodes()) { return -1; }
+    double sum = 0 ;
+    double xsum = 0;
+    double ysum = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        if (fired[i][j]) {
+          xsum += i*energy[i][j];
+          ysum += (8-j)*energy[i][j];
+          sum += energy[i][j];
+        }
+      }
+    }
+    xpos = xsum/(8.*sum);
+    ypos = ysum/(8.*sum);
+
+    return 0;
+  }
+
+  void SiPMBeta::Reset() {
+    valid = false;
+    nFired = 0;
+    dynodeFired = 0;
+    for (int i=0; i<8; ++i) {
+      for (int j=0; j<8; ++j) {
+        fired[i][j] = 0;
+      }
+    }
+  }
+
   void IonTrigger::SetMeas(PIXIE::Measurement &meas, int indx) {
     if (meas.finishCode) { return; }
     if (meas.outOfRange) { return; }
@@ -309,9 +607,11 @@ namespace FDSi {
     ecal = (energy[0] + PIXIE::Reader::Dither())*gain + offset;
   }
 
-  Scint::Scint()
-    : avtime(0), valid(false) {
-      for (int i=0; i<2; ++i) {
+  Scint::Scint() : Scint(0) {}
+
+  Scint::Scint(int nch)
+    : avtime(0), valid(false), nchans(nch) {
+      for (int i=0; i<nch; ++i) {
         energy[i] = 0;
         time[i] = 0;
         fired[i] = 0;
@@ -333,12 +633,13 @@ namespace FDSi {
 
   void Scint::Reset() {
     valid = false;
-    fired[0] = 0;
-    fired[1] = 0;
+    for (int i=0; i<nchans; ++i) {
+      fired[i] = 0;
+    }
   }
 
   PPAC::PPAC()
-    : valid(false), avtime(0) {
+    : valid(false), avtime(0), nchans(4) {
       for (int i=0; i<4; ++i) {
         fired[i] = 0;
         time[i] = 0;
@@ -346,10 +647,21 @@ namespace FDSi {
       }
     }
 
+  PPAC::PPAC(int nch)
+    : valid(false), avtime(0), nchans(nch) {
+      for (int i=0; i<4; ++i) {
+        fired[i] = 0;
+        time[i] = 0;
+        energy[i] = 0;
+      }
+    }
+  
+
   void PPAC::SetMeas(PIXIE::Measurement &meas, int indx) {
     if (meas.finishCode) { return; }
     if (meas.outOfRange) { return; }
     if (meas.CFDForce) { return; }
+    if (meas.eventEnergy <= thresh[indx]) { return; }
     if (fired[indx] == 0 || meas.eventEnergy > energy[indx]) {
       ++fired[indx];
       time[indx] = meas.eventTime;
@@ -357,14 +669,29 @@ namespace FDSi {
     }
   }
 
-  void PPAC::validate()  { 
-    valid = (fired[0] == 1 && fired[1] == 1 & fired[2] == 1 && fired[3] == 1);
-    avtime = (time[0] + time[1] + time[2] + time[3])/4;
+  void PPAC::validate()  {
+    valid = true;
+    int nfired = 0;
+    avtime = 0;
+    for (int i=0; i<nchans; ++i) {
+      if (fired[i] != 1) { valid = false; }
+      else {++nfired;}
+    }
+
+    if (nfired == 0) { return; }
+    
+    for (int i=0; i<nchans; ++i) {
+      if (fired[i] == 0) { continue; }
+      avtime += time[i];
+    }
+    if (nfired > 0) {
+      avtime /= nfired;
+    }
   }
 
   void PPAC::Reset() {
     valid = false;
-    for (int i=0; i<4; ++i) {
+    for (int i=0; i<nchans; ++i) {
       fired[i] = 0;
     }
   }
