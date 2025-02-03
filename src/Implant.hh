@@ -281,7 +281,7 @@ namespace FDSi {
       //maps (ID)->(object,index)
       ImplantChannel **implantMap[FD_MAX_CRATES][FD_MAX_SLOTS_PER_CRATE][FD_MAX_CHANNELS_PER_BOARD];
 
-      const static int nStored{200};
+      const static int nStored{300};
       int impCtr = 0;
     int sipmImpCtr = 0;
       int betaCtr = 0;
