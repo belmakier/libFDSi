@@ -72,6 +72,8 @@ namespace FDSi {
     int nGammas;
     int nPileUp;
     int nNonPrompt;
+
+    int CloverMult[MAX_CLOVERS+1];
     
     DEGAiHit hits[MAX_HITS];
     Gamma gammas[MAX_GAMMAS];

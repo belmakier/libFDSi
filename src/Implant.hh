@@ -43,6 +43,7 @@ namespace FDSi {
     public:
       double TOF;
       double dE;
+      double dE2; 
       unsigned long long time;
 
       double energy[3][5];
@@ -259,11 +260,11 @@ namespace FDSi {
 
   class PPAC  : ImplantChannel {
     public:
-      unsigned long long time[4];
-      double energy[4];
-    double thresh[4];
-      int fired[4];
-    int nchans;
+      unsigned long long time[5];
+      double energy[5];
+    double thresh[5];
+      int fired[5];
+    int present;
 
       unsigned long long avtime;
       bool valid = false;
@@ -278,52 +279,53 @@ namespace FDSi {
     public:
       //maps (chan,slot,crate)-> index
       int indexMap[FD_MAX_CRATES][FD_MAX_SLOTS_PER_CRATE][FD_MAX_CHANNELS_PER_BOARD];
+    int subIndexMap[FD_MAX_CRATES][FD_MAX_SLOTS_PER_CRATE][FD_MAX_CHANNELS_PER_BOARD];
       //maps (ID)->(object,index)
       ImplantChannel **implantMap[FD_MAX_CRATES][FD_MAX_SLOTS_PER_CRATE][FD_MAX_CHANNELS_PER_BOARD];
 
-      const static int nStored{300};
+      int nStored;
       int impCtr = 0;
     int sipmImpCtr = 0;
       int betaCtr = 0;
     int sipmBetaCtr = 0;
-      Implant imps[nStored];
-    SiPMImplant sipmImps[nStored];
-    SiPMBeta sipmBetas[nStored];
-      Beta betas[nStored];
+    Implant *imps;
+    SiPMImplant *sipmImps;
+    SiPMBeta *sipmBetas;
+    Beta *betas;
 
-      Beta *beta = &betas[0];    //current beta, implant
-      Implant *imp = &imps[0];
-    SiPMImplant *sipmImp = &sipmImps[0];
-    SiPMBeta *sipmBeta = &sipmBetas[0];                                   
+    bool sipm_present = false;
+    Beta *beta = NULL;
+    Implant *imp = NULL;
+    SiPMImplant *sipmImp = NULL;
+    SiPMBeta *sipmBeta = NULL;
 
       IonTrigger *fit;     
       IonTrigger *rit;     
-      Pin *pin0;
-      Pin *pin1;
-      Pin *pin2;
-      Pin *pin3;
-      Scint *cross_scint;
-      Scint *cross2_scint;
-      Scint *img_scint;
-      PPAC *db3ppac;
-      PPAC *db4ppac;
-    PPAC *db5ppac;
+      Pin *pin[4];
+      Scint *scint[4];
+      PPAC *ppac[6];
+
+      int nPins;
+      int nScints;
+      int nPPACs;
 
     public:
       ImplantEvent();
+    ImplantEvent(int nst, bool sipm = false);
+      ImplantEvent(int nPins, int nScints, int nPPACs);
+    void Init(int nst, bool sipm = false);
       void ReadConf(std::string conffile);
       void Set(PIXIE::Measurement &meas) {
         ImplantChannel **ch = implantMap[meas.crateID][meas.slotID][meas.channelNumber];
         int indx = indexMap[meas.crateID][meas.slotID][meas.channelNumber];
-        if (ch != NULL && indx >= 0) {
-          (*ch)->SetMeas(meas, indx);
+        int subindx = subIndexMap[meas.crateID][meas.slotID][meas.channelNumber];
+        if (ch != NULL && subindx >= 0) {
+          (*ch)->SetMeas(meas, subindx);
         }
       }
       void SetBetaThresh(int indx, float val);
       void SetImplantThresh(int indx, float val);
-    void SetDB3PPACThresh(int indx, float val);
-    void SetDB4PPACThresh(int indx, float val);
-    void SetDB5PPACThresh(int indx, float val);
+    void SetPPACThresh(int indx, int subindx, float val);
       void Reset();
   };
 

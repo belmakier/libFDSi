@@ -292,11 +292,13 @@ namespace FDSi {
     nValid = 0;
     nPileUp = 0;
     nNonPrompt = 0;
+    for (int i=0; i<MAX_CLOVERS+1; ++i) { CloverMult[i] = 0; }
     Gamma *gam;
 
     int nAddbacks = 0;
     std::vector<int> addbacks(nHits);
     for (int i=0; i<nHits; ++i) {
+      CloverMult[hits[i].CloverID] += 1;
       long long int hitit = hits[i].timestamp; 
       if (hits[i].PileUp == 1 ) { nPileUp += 1; continue; }
       if (hits[i].Valid == false) { continue; }

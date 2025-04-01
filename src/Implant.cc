@@ -5,27 +5,64 @@
 #include "Implant.hh"
 
 namespace FDSi {
+  ImplantEvent::ImplantEvent(int nst, bool sipm) {
+    nPins = 4;
+    nScints = 2;
+    nPPACs = 6;
+    Init(nst, sipm);
+  }
+
   ImplantEvent::ImplantEvent() {
+    nPins = 4;
+    nScints = 2;
+    nPPACs = 6;
+    Init(2000, false);
+  }
+
+  ImplantEvent::ImplantEvent(int np, int nsc, int npp) {
+    nPins = np;
+    nScints = nsc;
+    nPPACs = npp;
+    Init(2000, false);
+  }
+
+  void ImplantEvent::Init(int nst, bool sipm) {
     for (int cr=0; cr<FD_MAX_CRATES; ++cr) {
       for (int sl=0; sl<FD_MAX_SLOTS_PER_CRATE; ++sl) {
         for (int ch=0; ch<FD_MAX_CHANNELS_PER_BOARD; ++ch) {
           indexMap[cr][sl][ch] = -1;
+          subIndexMap[cr][sl][ch] = -1;
           implantMap[cr][sl][ch] = NULL;
         }
       }
     }
+    sipm_present = sipm;
     fit = new IonTrigger();
     rit = new IonTrigger();
-    pin0 = new Pin();
-    pin1 = new Pin();
-    pin2 = new Pin();
-    pin3 = new Pin();
-    cross_scint = new Scint(2);
-    cross2_scint = new Scint(4);
-    img_scint = new Scint(2);
-    db3ppac = new PPAC(2);
-    db4ppac = new PPAC(2);
-    db5ppac = new PPAC(4);
+    for (int i=0; i<nPins; ++i) {
+      pin[i] = new Pin();
+    }
+    for (int i=0; i<nScints; ++i) {
+      scint[i] = new Scint(2);
+    }
+    for (int i=0; i<nPPACs; ++i) {
+      ppac[i] = new PPAC();
+    }
+
+    nStored = nst;
+    if (!sipm) {
+      imps = new Implant[nStored];
+      imp = &imps[0];
+      betas = new Beta[nStored];
+      beta = &betas[0];
+    }
+    else {
+      sipmImps = new SiPMImplant[nStored];
+      sipmBetas = new SiPMBeta[nStored];
+      sipmImp = &sipmImps[0];
+      sipmBeta = &sipmBetas[0];
+    }
+      
   }
 
   void ImplantEvent::ReadConf(std::string conffile)  {
@@ -45,10 +82,11 @@ namespace FDSi {
 
       int crID, slID, chID;
       std::string name;
-      int indx;
-      ss >> crID >>  slID >>  chID >> name >> indx;
+      int indx, subindx;
+      ss >> crID >>  slID >>  chID >> name >> indx >> subindx;
 
       indexMap[crID][slID][chID] = indx;
+      subIndexMap[crID][slID][chID] = subindx;
       if (name == "beta") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&beta;
       }
@@ -67,35 +105,15 @@ namespace FDSi {
       else if (name == "rit") {
         implantMap[crID][slID][chID] = (ImplantChannel**)&rit;        
       }
-      else if (name == "pin0") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&pin0;
+      else if (name == "pin") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&pin[indx];
       }
-      else if (name == "pin1") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&pin1;
+      else if (name == "scint") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&scint[indx];
       }
-      else if (name == "pin2") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&pin2;
-      }
-      else if (name == "pin3") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&pin3;
-      }
-      else if (name == "cross_scint") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&cross_scint;
-      }
-      else if (name == "cross2_scint") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&cross2_scint;
-      }
-      else if (name == "img_scint") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&img_scint;
-      }
-      else if (name == "db3ppac") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&db3ppac;
-      }
-      else if (name == "db4ppac") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&db4ppac;
-      }
-      else if (name == "db5ppac") {
-        implantMap[crID][slID][chID] = (ImplantChannel**)&db5ppac;
+      else if (name == "ppac") {
+        implantMap[crID][slID][chID] = (ImplantChannel**)&ppac[indx];
+        ppac[indx]->present += (1 << subindx);
       }
     }
   }
@@ -106,16 +124,8 @@ namespace FDSi {
     }
   }
 
-  void ImplantEvent::SetDB3PPACThresh(int indx, float val) {
-    db3ppac->thresh[indx] = val;
-  }
-
-  void ImplantEvent::SetDB4PPACThresh(int indx, float val) {
-    db4ppac->thresh[indx] = val;
-  }
-
-  void ImplantEvent::SetDB5PPACThresh(int indx, float val) {
-    db5ppac->thresh[indx] = val;
+  void ImplantEvent::SetPPACThresh(int indx, int subindx, float val) {
+    ppac[indx]->thresh[subindx] = val;
   }
 
   void ImplantEvent::SetImplantThresh(int indx, float val) {
@@ -125,26 +135,29 @@ namespace FDSi {
   }
 
   void ImplantEvent::Reset() {
-    beta = &betas[betaCtr];
-    imp = &imps[impCtr];
-    sipmImp = &sipmImps[sipmImpCtr];
-    sipmBeta = &sipmBetas[sipmBetaCtr];
-    beta->Reset();
-    imp->Reset();
-    sipmImp->Reset();
-    sipmBeta->Reset();
+    if (!sipm_present) {
+      beta = &betas[betaCtr];
+      imp = &imps[impCtr];
+      beta->Reset();
+      imp->Reset();
+    }
+    else {
+      sipmImp = &sipmImps[sipmImpCtr];
+      sipmBeta = &sipmBetas[sipmBetaCtr];
+      sipmImp->Reset();
+      sipmBeta->Reset();
+    }
     fit->Reset();
     rit->Reset();
-    pin0->Reset();
-    pin1->Reset();
-    pin2->Reset();
-    pin3->Reset();
-    cross_scint->Reset();
-    cross2_scint->Reset();
-    img_scint->Reset();
-    db3ppac->Reset();
-    db4ppac->Reset();
-    db5ppac->Reset();
+    for (int i=0; i<nPins; ++i) {
+      pin[i]->Reset();
+    }
+    for (int i=0; i<nScints; ++i) {
+      scint[i]->Reset();
+    }
+    for (int i=0; i<nPPACs; ++i) {
+      ppac[i]->Reset();
+    }
   }
 
   Implant::Implant()
@@ -219,6 +232,8 @@ namespace FDSi {
 
   void Implant::Reset() {
     valid = false;
+    dE = 0;
+    dE2 = 0;
     validCut = false;
     nHits = 0; 
     for (int i=0; i<5; ++i) {
@@ -378,8 +393,8 @@ namespace FDSi {
 
       energy[0][indx] = meas.eventEnergy;
       //todo: handle if traces are not enabled
-      energy[1][indx] = meas.trace_meas[0].datum/16;
-      energy[2][indx] = meas.trace_meas[5].datum;
+      energy[1][indx] = (float)meas.trace_meas[0].datum/10.0;
+      energy[2][indx] = (float)meas.trace_meas[2].datum;
 
       trace[indx] = &meas.trace[0];
       tracelen = meas.traceLength;
@@ -639,23 +654,13 @@ namespace FDSi {
   }
 
   PPAC::PPAC()
-    : valid(false), avtime(0), nchans(4) {
-      for (int i=0; i<4; ++i) {
+    : valid(false), avtime(0), present(0) {
+      for (int i=0; i<5; ++i) {
         fired[i] = 0;
         time[i] = 0;
         energy[i] = 0;
       }
     }
-
-  PPAC::PPAC(int nch)
-    : valid(false), avtime(0), nchans(nch) {
-      for (int i=0; i<4; ++i) {
-        fired[i] = 0;
-        time[i] = 0;
-        energy[i] = 0;
-      }
-    }
-  
 
   void PPAC::SetMeas(PIXIE::Measurement &meas, int indx) {
     if (meas.finishCode) { return; }
@@ -670,28 +675,35 @@ namespace FDSi {
   }
 
   void PPAC::validate()  {
+    if (present == 0) { valid = false; return; }
     valid = true;
     int nfired = 0;
     avtime = 0;
-    for (int i=0; i<nchans; ++i) {
-      if (fired[i] != 1) { valid = false; }
+    for (int i=0; i<5; ++i) {
+      if (fired[i] != (( present & (1 << i) ) >> i )) { valid = false; }
       else {++nfired;}
     }
 
     if (nfired == 0) { return; }
-    
-    for (int i=0; i<nchans; ++i) {
-      if (fired[i] == 0) { continue; }
-      avtime += time[i];
-    }
-    if (nfired > 0) {
-      avtime /= nfired;
+
+    if ( (present & 1) == 1 ) { avtime = time[0]; } 
+    else {
+      int n = 0;
+      avtime = 0;
+      for (int i=1; i<5; ++i) {
+        if (fired[i] == 0) { continue; }
+        avtime += time[i];
+        n++;
+      }
+      if (n > 0) {
+        avtime /= (double)n; 
+      }
     }
   }
 
   void PPAC::Reset() {
     valid = false;
-    for (int i=0; i<nchans; ++i) {
+    for (int i=0; i<5; ++i) {
       fired[i] = 0;
     }
   }
