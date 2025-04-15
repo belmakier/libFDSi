@@ -58,9 +58,13 @@ namespace FDSi {
 
       bool present = false;
       bool valid = false;
-    bool validCut = false;
+      bool validTOF = false;
+      bool validCut = false;
       int nHits = 0;
       int cutID = 0;
+
+      unsigned long long start;
+      unsigned long long stop;
 
       int fired[5];
 
@@ -248,7 +252,7 @@ namespace FDSi {
       unsigned long long time[4];
       int fired[4];
       double thresh[4];
-    int nchans = 2;
+    int nchans = 4;
 
       unsigned long long avtime = 0;
       bool valid = false;

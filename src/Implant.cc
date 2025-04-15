@@ -43,7 +43,7 @@ namespace FDSi {
       pin[i] = new Pin();
     }
     for (int i=0; i<nScints; ++i) {
-      scint[i] = new Scint(2);
+      scint[i] = new Scint(4);
     }
     for (int i=0; i<nPPACs; ++i) {
       ppac[i] = new PPAC();
